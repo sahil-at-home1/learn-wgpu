@@ -16,7 +16,13 @@ struct State {
 impl State {
     // Creating some of the wgpu types requires async code
     async fn new(window: Window) -> Self {
-        todo!()
+        let size = window.inner_size();
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor { 
+            backends: wgpu::Backends::all(), 
+            dx12_shader_compiler: Default::default(),
+        });
+
+        return Self
     }
 
     pub fn window(&self) -> &Window {
