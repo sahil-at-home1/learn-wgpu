@@ -1,5 +1,6 @@
 use learn_wgpu::run;
+use futures::executor::block_on;
 
 fn main() {
-    run();
+    block_on(run());
 }

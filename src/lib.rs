@@ -4,18 +4,18 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-struct State {
+struct State<'a> {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    window: Window,
+    window: &'a mut Window,
 }
 
-impl State {
+impl<'a> State<'a> {
     // Creating some of the wgpu types requires async code
-    async fn new(window: Window) -> Self {
+    async fn new(window: &'a mut Window) -> State<'a> {
         let size = window.inner_size();
         // the instance is a handle to the GPU
         let instance = wgpu::Instance::new(
@@ -25,7 +25,7 @@ impl State {
             }
         );
         // create the surface to present to
-        let surface = unsafe { instance.create_surface(&window) }.unwrap();
+        let surface = unsafe { instance.create_surface(window) }.unwrap();
         let options = wgpu::RequestAdapterOptions{
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: Some(&surface),
@@ -60,7 +60,7 @@ impl State {
         };
         surface.configure(&device, &config);
 
-        return Self {
+        return State {
             window,
             surface,
             device,
@@ -71,7 +71,7 @@ impl State {
     }
 
     pub fn window(&self) -> &Window {
-        &self.window
+        self.window
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
@@ -92,20 +92,21 @@ impl State {
 }
 
 
-pub fn run() {
+pub async fn run() {
     env_logger::init();
     let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    let mut window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    event_loop.run(move |event, _, control_flow| match event {
+    let mut state = State::new(&mut window).await;
+
+    event_loop.run(move | event, _, control_flow | match event {
         Event::WindowEvent {
             ref event,
             window_id,
         } if window_id == window.id() => match event {
             WindowEvent::CloseRequested
             | WindowEvent::KeyboardInput {
-                input:
-                    KeyboardInput {
+                input: KeyboardInput {
                         state: ElementState::Pressed,
                         virtual_keycode: Some(VirtualKeyCode::Escape),
                         ..
