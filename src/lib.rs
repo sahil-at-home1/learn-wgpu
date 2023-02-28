@@ -4,18 +4,18 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-struct State<'a> {
+struct State {
     surface: wgpu::Surface,
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
-    window: &'a mut Window,
+    window: Window,
 }
 
-impl<'a> State<'a> {
+impl State {
     // Creating some of the wgpu types requires async code
-    async fn new(window: &'a mut Window) -> State<'a> {
+    async fn new(window: Window) -> State {
         let size = window.inner_size();
         // the instance is a handle to the GPU
         let instance = wgpu::Instance::new(
@@ -25,7 +25,7 @@ impl<'a> State<'a> {
             }
         );
         // create the surface to present to
-        let surface = unsafe { instance.create_surface(window) }.unwrap();
+        let surface = unsafe { instance.create_surface(&window) }.unwrap();
         let options = wgpu::RequestAdapterOptions{
             power_preference: wgpu::PowerPreference::default(),
             compatible_surface: Some(&surface),
@@ -71,11 +71,16 @@ impl<'a> State<'a> {
     }
 
     pub fn window(&self) -> &Window {
-        self.window
+        &self.window
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        todo!()
+        if new_size.width > 0 && new_size.height > 0 {
+            self.size = new_size;
+            self.config.width = new_size.width;
+            self.config.height = new_size.height;
+            self.surface.configure(&self.device, &self.config)
+        }
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
@@ -95,15 +100,15 @@ impl<'a> State<'a> {
 pub async fn run() {
     env_logger::init();
     let event_loop = EventLoop::new();
-    let mut window = WindowBuilder::new().build(&event_loop).unwrap();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
 
-    let mut state = State::new(&mut window).await;
+    let mut state = State::new(window).await;
 
     event_loop.run(move | event, _, control_flow | match event {
         Event::WindowEvent {
             ref event,
             window_id,
-        } if window_id == window.id() => match event {
+        } if window_id == state.window.id() => match event {
             WindowEvent::CloseRequested
             | WindowEvent::KeyboardInput {
                 input: KeyboardInput {
@@ -113,6 +118,12 @@ pub async fn run() {
                     },
                 ..
             } => *control_flow = ControlFlow::Exit,
+            WindowEvent::Resized(physical_size) => {
+                state.resize(*physical_size);
+            }
+            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                state.resize(**new_inner_size)
+            }
             _ => {}
         },
         _ => {}
