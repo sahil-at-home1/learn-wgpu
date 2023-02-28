@@ -84,11 +84,10 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        todo!()
+        false
     }
 
     fn update(&mut self) {
-        todo!()
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -104,29 +103,34 @@ pub async fn run() {
 
     let mut state = State::new(window).await;
 
-    event_loop.run(move | event, _, control_flow | match event {
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        } if window_id == state.window.id() => match event {
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                input: KeyboardInput {
-                        state: ElementState::Pressed,
-                        virtual_keycode: Some(VirtualKeyCode::Escape),
+    event_loop.run(move | event, _, control_flow | {
+        match event {
+            Event::WindowEvent {
+                ref event,
+                window_id,
+            } if window_id == state.window().id() => if !state.input(event) {
+                match event {
+                    WindowEvent::CloseRequested 
+                    | WindowEvent::KeyboardInput {
+                        input: 
+                            KeyboardInput {
+                                state: ElementState::Pressed,
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            },
                         ..
-                    },
-                ..
-            } => *control_flow = ControlFlow::Exit,
-            WindowEvent::Resized(physical_size) => {
-                state.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                state.resize(**new_inner_size)
+                    } => *control_flow = ControlFlow::Exit,
+                    WindowEvent::Resized(physical_size) => {
+                        state.resize(*physical_size);
+                    }
+                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                        state.resize(**new_inner_size)
+                    }
+                    _ => {}
+                }
             }
             _ => {}
-        },
-        _ => {}
+        }
     });
 }
 
