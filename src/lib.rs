@@ -42,8 +42,32 @@ impl State {
             label: None,
         };
         let (device, queue) = adapter.request_device(&desc, None).await.unwrap();
-        
-        return Self
+        // configure the surface
+        let surface_caps = surface.get_capabilities(&adapter);
+        let surface_format = surface_caps.formats.iter()
+            .copied()
+            .filter(|f| f.describe().srgb)
+            .next()
+            .unwrap_or(surface_caps.formats[0]);
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: surface_format,
+            width: size.width,
+            height: size.height,
+            present_mode: surface_caps.present_modes[0],
+            alpha_mode: surface_caps.alpha_modes[0],
+            view_formats: vec![],
+        };
+        surface.configure(&device, &config);
+
+        return Self {
+            window,
+            surface,
+            device,
+            queue,
+            config,
+            size,
+        }
     }
 
     pub fn window(&self) -> &Window {
