@@ -91,7 +91,32 @@ impl State {
     }
 
     fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        todo!()
+        let output = self.surface.get_current_texture()?;
+        let texture_desc = wgpu::TextureViewDescriptor::default();
+        let view = output.texture.create_view(&texture_desc);
+        let encoder_desc = wgpu::CommandEncoderDescriptor{label: Some("Render Encoder")};
+        let mut encoder = self.device.create_command_encoder(&encoder_desc);
+        // prepare render pass
+        let bg_color = wgpu::Color{r: 0.1, g: 0.2, b: 0.3, a: 1.0};
+        let ops = wgpu::Operations {load: wgpu::LoadOp::Clear(bg_color), store: true};
+        let color_attachment = wgpu::RenderPassColorAttachment{
+                view: &view,
+                resolve_target: None,
+                ops: ops,
+            };
+        let render_pass_desc = wgpu::RenderPassDescriptor{
+            label: Some("Render Pass"),
+            color_attachments: &[Some(color_attachment)],
+            depth_stencil_attachment: None,
+        };
+        let _render_pass = encoder.begin_render_pass(&render_pass_desc);
+        // need to release mut borrow before calling finish on encoder
+        drop(_render_pass);
+        // submit command buffer (as an iter) to render queue
+        self.queue.submit(std::iter::once(encoder.finish()));
+        output.present();
+
+        Ok(())
     }
 }
 
@@ -105,29 +130,42 @@ pub async fn run() {
 
     event_loop.run(move | event, _, control_flow | {
         match event {
-            Event::WindowEvent {
-                ref event,
-                window_id,
-            } if window_id == state.window().id() => if !state.input(event) {
-                match event {
-                    WindowEvent::CloseRequested 
-                    | WindowEvent::KeyboardInput {
-                        input: 
-                            KeyboardInput {
-                                state: ElementState::Pressed,
-                                virtual_keycode: Some(VirtualKeyCode::Escape),
+            Event::WindowEvent {ref event, window_id} 
+                if window_id == state.window().id() => {
+                    if !state.input(event) {
+                        match event {
+                            WindowEvent::CloseRequested | WindowEvent::KeyboardInput {
+                                input: KeyboardInput {
+                                        state: ElementState::Pressed,
+                                        virtual_keycode: Some(VirtualKeyCode::Escape),
+                                        ..
+                                    },
                                 ..
-                            },
-                        ..
-                    } => *control_flow = ControlFlow::Exit,
-                    WindowEvent::Resized(physical_size) => {
-                        state.resize(*physical_size);
+                            } => *control_flow = ControlFlow::Exit,
+                            WindowEvent::Resized(physical_size) => {
+                                state.resize(*physical_size);
+                            }
+                            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                                state.resize(**new_inner_size)
+                            }
+                            _ => {}
+                        }
                     }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        state.resize(**new_inner_size)
-                    }
-                    _ => {}
                 }
+            Event::RedrawRequested(window_id) 
+                if window_id == state.window().id() => {
+                    state.update();
+                    match state.render() {
+                        Ok(_) => {}
+                        Err(wgpu::SurfaceError::Lost) => state.resize(state.size),
+                        Err(wgpu::SurfaceError::OutOfMemory) => *control_flow = ControlFlow::Exit,
+                        Err(e) => eprintln!("{:?}", e),
+                    }
+                }
+            Event::MainEventsCleared => {
+                // RedrawRequested will only trigger once
+                // unless we request it
+                state.window().request_redraw();
             }
             _ => {}
         }
