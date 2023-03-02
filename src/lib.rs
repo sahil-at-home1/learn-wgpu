@@ -3,6 +3,7 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+use rand::Rng;
 
 struct State {
     surface: wgpu::Surface,
@@ -11,6 +12,7 @@ struct State {
     config: wgpu::SurfaceConfiguration,
     size: winit::dpi::PhysicalSize<u32>,
     window: Window,
+    color: wgpu::Color,
 }
 
 impl State {
@@ -59,6 +61,13 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
+        // set a default background color
+        let color = wgpu::Color{
+            r: 1.0, 
+            g: 1.0, 
+            b: 1.0, 
+            a: 1.0
+        };
 
         return State {
             window,
@@ -67,6 +76,7 @@ impl State {
             queue,
             config,
             size,
+            color,
         }
     }
 
@@ -84,7 +94,23 @@ impl State {
     }
 
     fn input(&mut self, event: &WindowEvent) -> bool {
-        false
+        match event {
+            WindowEvent::MouseInput { 
+                button: MouseButton::Left, 
+                state: ElementState::Pressed, 
+                .. 
+            } => {
+                self.color = wgpu::Color{
+                    r: rand::thread_rng().gen_range(0.0..1.0),
+                    g: rand::thread_rng().gen_range(0.0..1.0),
+                    b: rand::thread_rng().gen_range(0.0..1.0),
+                    a: 1.0,
+                };
+                self.window().request_redraw();
+                true
+            },
+            _ => false,
+        }
     }
 
     fn update(&mut self) {
@@ -97,8 +123,10 @@ impl State {
         let encoder_desc = wgpu::CommandEncoderDescriptor{label: Some("Render Encoder")};
         let mut encoder = self.device.create_command_encoder(&encoder_desc);
         // prepare render pass
-        let bg_color = wgpu::Color{r: 0.1, g: 0.2, b: 0.3, a: 1.0};
-        let ops = wgpu::Operations {load: wgpu::LoadOp::Clear(bg_color), store: true};
+        let ops = wgpu::Operations{
+            load: wgpu::LoadOp::Clear(self.color), 
+            store: true
+        };
         let color_attachment = wgpu::RenderPassColorAttachment{
                 view: &view,
                 resolve_target: None,
