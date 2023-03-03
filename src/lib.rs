@@ -196,7 +196,7 @@ impl State {
             },
             WindowEvent::KeyboardInput { 
                 input: KeyboardInput {
-                    scancode: 39, 
+                    scancode: 0x39, 
                     state: ElementState::Pressed,
                     ..
                 },
