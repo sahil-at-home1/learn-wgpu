@@ -1,4 +1,4 @@
-use wgpu::PrimitiveState;
+use wgpu::{PrimitiveState};
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -14,7 +14,8 @@ struct State {
     size: winit::dpi::PhysicalSize<u32>,
     window: Window,
     color: wgpu::Color,
-    render_pipeline: wgpu::RenderPipeline,
+    render_pipelines: Vec<wgpu::RenderPipeline>,
+    render_pipeline_idx: usize,
 }
 
 impl State {
@@ -112,7 +113,7 @@ impl State {
             mask: !0,
             alpha_to_coverage_enabled: false,
         };
-        let render_pipeline_desc = wgpu::RenderPipelineDescriptor{
+        let render_pipeline_desc1 = wgpu::RenderPipelineDescriptor{
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: vertex_state,
@@ -122,8 +123,35 @@ impl State {
             multisample: multisample_state,
             multiview: None,
         };
-        let render_pipeline = device.create_render_pipeline(&render_pipeline_desc);
-
+        let render_pipeline1 = device.create_render_pipeline(&render_pipeline_desc1);
+        // challenge render pipeline
+        let vertex_state2 = wgpu::VertexState {
+            module: &shader,
+            entry_point: "vs_main",
+            buffers: &[],
+        };
+        let fragment_state2 = wgpu::FragmentState {
+            module: &shader,
+            entry_point: "fs_main2",
+            targets: &[Some(wgpu::ColorTargetState {
+                format: config.format,
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })]
+        };
+        let render_pipeline_desc2 = wgpu::RenderPipelineDescriptor{
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: vertex_state2,
+            fragment: Some(fragment_state2),
+            primitive: primitive_state,
+            depth_stencil: None,
+            multisample: multisample_state,
+            multiview: None,
+        };
+        let render_pipeline2 = device.create_render_pipeline(&render_pipeline_desc2);
+        let render_pipelines = vec![render_pipeline1, render_pipeline2];
+        let render_pipeline_idx = 0;
         return State {
             window,
             surface,
@@ -132,7 +160,8 @@ impl State {
             config,
             size,
             color,
-            render_pipeline,
+            render_pipelines, 
+            render_pipeline_idx, 
         }
     }
 
@@ -165,6 +194,17 @@ impl State {
                 self.window().request_redraw();
                 true
             },
+            WindowEvent::KeyboardInput { 
+                input: KeyboardInput {
+                    scancode: 39, 
+                    state: ElementState::Pressed,
+                    ..
+                },
+                ..
+            } => {
+                self.render_pipeline_idx = if self.render_pipeline_idx > 0 { 0 } else { 1 };
+                true
+            },
             _ => false,
         }
     }
@@ -194,7 +234,7 @@ impl State {
             depth_stencil_attachment: None,
         };
         let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
-        render_pass.set_pipeline(&self.render_pipeline);
+        render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_idx]);
         render_pass.draw(0..3, 0..1);
         // need to release mut borrow before calling finish on encoder
         drop(render_pass);
