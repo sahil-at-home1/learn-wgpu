@@ -211,13 +211,14 @@ impl State {
             }
         );
         // create the index buffer
-        let index_buffer_desc = wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        };
-        let index_buffer = device.create_buffer_init(&index_buffer_desc);
-        let num_indices = VERTICES.len() as u32;
+        let index_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Index Buffer"),
+                contents: bytemuck::cast_slice(INDICES),
+                usage: wgpu::BufferUsages::INDEX,
+            }
+        );
+        let num_indices = INDICES.len() as u32;
 
         return State {
             window,
