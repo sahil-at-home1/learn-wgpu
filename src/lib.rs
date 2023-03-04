@@ -38,11 +38,19 @@ impl Vertex {
     }
 }
 
-// arranged in counter-clockwise order
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
-    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
-    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+    Vertex { position: [-0.0868241, 0.49240386, 0.0], color: [0.5, 0.0, 0.5] }, // A
+    Vertex { position: [-0.49513406, 0.06958647, 0.0], color: [0.5, 0.0, 0.5] }, // B
+    Vertex { position: [-0.21918549, -0.44939706, 0.0], color: [0.5, 0.0, 0.5] }, // C
+    Vertex { position: [0.35966998, -0.3473291, 0.0], color: [0.5, 0.0, 0.5] }, // D
+    Vertex { position: [0.44147372, 0.2347359, 0.0], color: [0.5, 0.0, 0.5] }, // E
+];
+
+// triangles have their vertices arranged in counter-clockwise order
+const INDICES: &[u16] = &[
+    0, 1, 4,
+    1, 2, 4,
+    2, 3, 4,
 ];
 
 struct State {
@@ -56,7 +64,8 @@ struct State {
     render_pipelines: Vec<wgpu::RenderPipeline>,
     render_pipeline_idx: usize,
     vertex_buffer: wgpu::Buffer,
-    num_vertices: u32,
+    index_buffer: wgpu::Buffer,
+    num_indices: u32,
 }
 
 impl State {
@@ -201,7 +210,14 @@ impl State {
                 usage: wgpu::BufferUsages::VERTEX,
             }
         );
-        let num_vertices = VERTICES.len() as u32;
+        // create the index buffer
+        let index_buffer_desc = wgpu::util::BufferInitDescriptor {
+            label: Some("Index Buffer"),
+            contents: bytemuck::cast_slice(INDICES),
+            usage: wgpu::BufferUsages::INDEX,
+        };
+        let index_buffer = device.create_buffer_init(&index_buffer_desc);
+        let num_indices = VERTICES.len() as u32;
 
         return State {
             window,
@@ -214,7 +230,8 @@ impl State {
             render_pipelines, 
             render_pipeline_idx, 
             vertex_buffer,
-            num_vertices,
+            index_buffer,
+            num_indices,
         }
     }
 
@@ -289,7 +306,11 @@ impl State {
         let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_idx]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.draw(0..self.num_vertices, 0..1);
+        render_pass.set_index_buffer(
+            self.index_buffer.slice(..), 
+            wgpu::IndexFormat::Uint16,
+        );
+        render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
         // need to release mut borrow before calling finish on encoder
         drop(render_pass);
         // submit command buffer (as an iter) to render queue
