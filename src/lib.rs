@@ -39,19 +39,33 @@ impl Vertex {
 }
 
 const VERTICES: &[Vertex] = &[
-    Vertex { position: [-0.0868241, 0.49240386, 0.0], color: [0.5, 0.0, 0.5] }, // A
-    Vertex { position: [-0.49513406, 0.06958647, 0.0], color: [0.5, 0.0, 0.5] }, // B
-    Vertex { position: [-0.21918549, -0.44939706, 0.0], color: [0.5, 0.0, 0.5] }, // C
-    Vertex { position: [0.35966998, -0.3473291, 0.0], color: [0.5, 0.0, 0.5] }, // D
-    Vertex { position: [0.44147372, 0.2347359, 0.0], color: [0.5, 0.0, 0.5] }, // E
+    Vertex { position: [-0.50, -0.75, 0.0], color: [0.5, 0.0, 0.5] }, 
+    Vertex { position: [0.50, -0.75, 0.0], color: [0.5, 0.0, 0.5] }, 
+    Vertex { position: [0.75, 0.50, 0.0], color: [0.5, 0.0, 0.5] }, 
+    Vertex { position: [0.00, 1.00, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [-0.75, 0.50, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [-0.30, 0.00, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [0.00, -0.30, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [0.30, 0.00, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [0.25, 0.45, 0.0], color: [0.5, 0.0, 0.5] },
+    Vertex { position: [-0.25, 0.45, 0.0], color: [0.5, 0.0, 0.5] },
 ];
 
 // triangles have their vertices arranged in counter-clockwise order
-const INDICES: &[u16] = &[
-    0, 1, 4,
-    1, 2, 4,
-    2, 3, 4,
+const INDICES_PENTAGON: &[u16] = &[
+    0, 1, 2,
+    0, 2, 3,
+    0, 3, 4,
 ];
+const INDICES_CHALLENGE: &[u16] = &[
+    0, 7, 9,
+    5, 1, 8,
+    6, 2, 9,
+    5, 7, 3,
+    4, 6, 8,
+];
+
+
 
 struct State {
     surface: wgpu::Surface,
@@ -64,7 +78,8 @@ struct State {
     render_pipelines: Vec<wgpu::RenderPipeline>,
     render_pipeline_idx: usize,
     vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
+    index_buffers: Vec<wgpu::Buffer>,
+    index_buffer_idx: usize,
     num_indices: u32,
 }
 
@@ -211,14 +226,24 @@ impl State {
             }
         );
         // create the index buffer
-        let index_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Index Buffer"),
-                contents: bytemuck::cast_slice(INDICES),
-                usage: wgpu::BufferUsages::INDEX,
-            }
-        );
-        let num_indices = INDICES.len() as u32;
+        let index_buffers = vec![
+            device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor{
+                    label: Some("Index buffer 1"),
+                    contents: bytemuck::cast_slice(INDICES_PENTAGON),
+                    usage: wgpu::BufferUsages::INDEX,
+                }
+            ),
+            device.create_buffer_init(
+                &wgpu::util::BufferInitDescriptor {
+                    label: Some("Index buffer 2"),
+                    contents: bytemuck::cast_slice(INDICES_CHALLENGE),
+                    usage: wgpu::BufferUsages::INDEX,
+                }
+            )
+        ];
+        let index_buffer_idx: usize = 0;
+        let num_indices = INDICES_PENTAGON.len() as u32;
 
         return State {
             window,
@@ -231,7 +256,8 @@ impl State {
             render_pipelines, 
             render_pipeline_idx, 
             vertex_buffer,
-            index_buffer,
+            index_buffers,
+            index_buffer_idx,
             num_indices,
         }
     }
@@ -274,6 +300,12 @@ impl State {
                 ..
             } => {
                 self.render_pipeline_idx = if self.render_pipeline_idx > 0 { 0 } else { 1 };
+                self.index_buffer_idx = if self.index_buffer_idx > 0 { 0 } else { 1 };
+                if self.index_buffer_idx == 0 {
+                    self.num_indices = INDICES_PENTAGON.len() as u32;
+                } else {
+                    self.num_indices = INDICES_CHALLENGE.len() as u32;
+                }
                 true
             },
             _ => false,
@@ -308,7 +340,7 @@ impl State {
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_idx]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(
-            self.index_buffer.slice(..), 
+            self.index_buffers[self.index_buffer_idx].slice(..), 
             wgpu::IndexFormat::Uint16,
         );
         render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
