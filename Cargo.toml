@@ -13,5 +13,5 @@ wgpu = "0.15"
 futures = "0.3"
 rand = "0.8"
 bytemuck = { version = "1.12", features = [ "derive" ] }
-bevy = "0.9.1"
+image = {version = "0.24", default-features = false, features = ["png", "jpeg"]}
 
