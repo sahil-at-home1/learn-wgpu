@@ -83,8 +83,8 @@ struct State {
     index_buffers: Vec<wgpu::Buffer>,
     index_buffer_idx: usize,
     num_indices: u32,
-    diffuse_bind_group: wgpu::BindGroup,
-    diffuse_texture: texture::Texture,
+    bind_group_buffer: Vec<wgpu::BindGroup>,
+    bind_group_buffer_idx: usize,
 }
 
 impl State {
@@ -133,9 +133,7 @@ impl State {
             view_formats: vec![],
         };
         surface.configure(&device, &config);
-        // get the image file as bytes
-        let diffuse_bytes = include_bytes!("happy-tree.png");
-        let diffuse_texture = texture::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png").unwrap();
+
         // create bind group to describe how textures can be accessed by shader
         let sampled_texture = wgpu::BindGroupLayoutEntry {
             binding: 0,
@@ -158,21 +156,44 @@ impl State {
             label: Some("texture_bind_group_layout"),
         };
         let texture_bind_group_layout = device.create_bind_group_layout(&bind_group_layout_desc);
-        let bind_group_entry1 = wgpu::BindGroupEntry {
+        // texture 1 bind group
+        let texture1 = texture::Texture::from_bytes(
+                &device, &queue, include_bytes!("happy-tree.png"), 
+                "happy-tree.png").unwrap();
+        let bind_group1_entry1 = wgpu::BindGroupEntry {
             binding: 0,
-            resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
+            resource: wgpu::BindingResource::TextureView(&texture1.view),
         };
-        let bind_group_entry2 = wgpu::BindGroupEntry {
+        let bind_group1_entry2 = wgpu::BindGroupEntry {
             binding: 1,
-            resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+            resource: wgpu::BindingResource::Sampler(&texture1.sampler),
         };
-        let bind_group_desc = wgpu::BindGroupDescriptor {
+        let bind_group1_desc = wgpu::BindGroupDescriptor {
             layout: &texture_bind_group_layout,
-            entries: &[bind_group_entry1, bind_group_entry2],
+            entries: &[bind_group1_entry1, bind_group1_entry2],
             label: Some("diffuse_bind_group"),
         };
-        let diffuse_bind_group = device.create_bind_group(&bind_group_desc);
-
+        let bind_group1 = device.create_bind_group(&bind_group1_desc);
+        // texture 2 bind group
+        let texture2 = texture::Texture::from_bytes(
+                &device, &queue, include_bytes!("hmm.png"), 
+                "hmm.png").unwrap();
+        let bind_group2_entry1 = wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::TextureView(&texture2.view),
+        };
+        let bind_group2_entry2 = wgpu::BindGroupEntry {
+            binding: 1,
+            resource: wgpu::BindingResource::Sampler(&texture2.sampler),
+        };
+        let bind_group2_desc = wgpu::BindGroupDescriptor {
+            layout: &texture_bind_group_layout,
+            entries: &[bind_group2_entry1, bind_group2_entry2],
+            label: Some("diffuse_bind_group"),
+        };
+        let bind_group2 = device.create_bind_group(&bind_group2_desc);
+        let bind_group_buffer = vec![bind_group1, bind_group2];
+        let bind_group_buffer_idx = 0;
         // set a default background color
         let color = wgpu::Color{
             r: 1.0, 
@@ -303,8 +324,8 @@ impl State {
             index_buffers,
             index_buffer_idx,
             num_indices,
-            diffuse_bind_group,
-            diffuse_texture,
+            bind_group_buffer,
+            bind_group_buffer_idx,
         }
     }
 
@@ -345,6 +366,7 @@ impl State {
                 },
                 ..
             } => {
+                self.bind_group_buffer_idx = if self.bind_group_buffer_idx > 0 { 0 } else { 1 };
                 self.render_pipeline_idx = if self.render_pipeline_idx > 0 { 0 } else { 1 };
                 self.index_buffer_idx = if self.index_buffer_idx > 0 { 0 } else { 1 };
                 if self.index_buffer_idx == 0 {
@@ -384,7 +406,7 @@ impl State {
         };
         let mut render_pass = encoder.begin_render_pass(&render_pass_desc);
         render_pass.set_pipeline(&self.render_pipelines[self.render_pipeline_idx]);
-        render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
+        render_pass.set_bind_group(0, &self.bind_group_buffer[self.bind_group_buffer_idx], &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(
             self.index_buffers[self.index_buffer_idx].slice(..), 
